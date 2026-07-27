@@ -187,7 +187,72 @@ class DataFrameCleaner:
             df[col] = df[col].map(lambda x: x.title() if isinstance(x, str) else x)
         self._df = df
         return self
+        
+    def outliers(self, cols=None, method='iqr', action='drop', threshold=1.5, z_threshold=3.0):
+        """
+        Detect and handle outliers in numeric columns.
 
+        Parameters
+        ----------
+        cols : list of str, optional
+            Columns to check. Defaults to all numeric columns.
+        method : {'iqr', 'zscore'}
+            Detection method. 'iqr' uses the interquartile range rule;
+            'zscore' uses standard deviations from the mean.
+        action : {'drop', 'replace'}
+            What to do with detected outliers.
+            'drop'    -- remove the entire row.
+            'replace' -- replace the outlier value with NaN.
+        threshold : float
+            IQR multiplier (default 1.5). Only used when method='iqr'.
+        z_threshold : float
+            Z-score cutoff (default 3.0). Only used when method='zscore'.
+    
+        Returns
+        -------
+        self
+        """
+        import numpy as np
+        df = self._df.copy()
+        numeric_cols = cols if cols is not None else df.select_dtypes(include='number').columns.tolist()
+    
+        if method not in ('iqr', 'zscore'):
+            raise ValueError("method must be 'iqr' or 'zscore'")
+        if action not in ('drop', 'replace'):
+            raise ValueError("action must be 'drop' or 'replace'")
+    
+        outlier_mask = pd.DataFrame(False, index=df.index, columns=numeric_cols)
+    
+        for col in numeric_cols:
+            series = df[col].dropna()
+            if method == 'iqr':
+                Q1 = series.quantile(0.25)
+                Q3 = series.quantile(0.75)
+                IQR = Q3 - Q1
+                lower = Q1 - threshold * IQR
+                upper = Q3 + threshold * IQR
+                outlier_mask[col] = (df[col] < lower) | (df[col] > upper)
+            elif method == 'zscore':
+                mean = series.mean()
+                std = series.std()
+                if std == 0:
+                    continue
+                z_scores = (df[col] - mean) / std
+                outlier_mask[col] = z_scores.abs() > z_threshold
+    
+        if action == 'drop':
+            rows_to_drop = outlier_mask.any(axis=1)
+            df = df[~rows_to_drop]
+        elif action == 'replace':
+            for col in numeric_cols:
+                df.loc[outlier_mask[col], col] = np.nan
+    
+        self._df = df
+        return self
+
+
+
+    
     # -----------------------------------
     # Chain-friendly print preview
     # -----------------------------------
