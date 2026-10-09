@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local test files
+1.ipynb
+datacleaner.py
+
+# Local Excel files
+Excel_Files/
